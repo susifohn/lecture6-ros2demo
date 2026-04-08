@@ -207,5 +207,89 @@ moved in circles.
 
 ![circles](./assets/CPS_Ex06_turtlebot_circle_mode.png)
 
+### Question: 
+Why use create_timer?
+### Answer
+The create_timer is used to call timer_callback repeatedly at a fixed frequency.
+Without it, the node would publish one single Twist message and stop. With the timer, it keeps publishing the velocity command continuously, which is necessary because Gazebo's robot controller expects a continuous stream of velocity commands.
 
+## Aufgabe 1b
 
+odom_monitor.py
+```python
+import rclpy
+from rclpy.node import Node
+from nav_msgs.msg import Odometry
+
+class OdomMonitor(Node):
+    def __init__(self):
+        super().__init__('odom_monitor')
+        self.subscription = self.create_subscription(
+            Odometry,
+            '/odom',
+            self.odom_callback,
+            10)
+        self.get_logger().info('OdomMonitor node started')
+
+    def odom_callback(self, msg):
+        x = msg.pose.pose.position.x
+        y = msg.pose.pose.position.y
+        linear_x = msg.twist.twist.linear.x
+        angular_z = msg.twist.twist.angular.z
+
+        self.get_logger().info(
+            f'Position: x={x:.3f}, y={y:.3f} | '
+            f'Velocity: linear={linear_x:.3f} m/s, angular={angular_z:.3f} rad/s'
+        )
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = OdomMonitor()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+Add entry point to *setup.py*
+```python
+entry_points={
+    'console_scripts': [
+        'circle_motion = student_robotics.circle_motion:main',
+        'odom_monitor = student_robotics.odom_monitor:main',  # ← add this
+    ],
+},
+```
+
+Then rebuild and start in two terminals:
+```bash
+cb
+sb
+ros2 run student_robotics odom_monitor   #this in terminal 1
+ros2 run student_robotics circle_motion  #this in terminal 2
+```
+
+The Screenshot shows both terminals with the running processes:
+
+![Terminal with odometer and moving](./assets/CPS_Ex06_circle_odom.png)
+
+Showing both nodes running:
+```bash
+root@49ed0b86c179:/workspace/turtlebot3_ws# ros2 node list 
+/circle_motion
+/gazebo
+/odom_monitor
+/robot_state_publisher
+/teleop_keyboard
+/turtlebot3_diff_drive
+/turtlebot3_imu
+/turtlebot3_joint_state
+/turtlebot3_laserscan
+root@49ed0b86c179:/workspace/turtlebot3_ws# 
+```
+
+### Question
+How does pub-sub decoupling work?
+### Answer
+In ROS2, publishers and subscribers are completely independent — a publisher simply sends messages to a topic without knowing if anyone is listening, and a subscriber reads from that topic without knowing who is sending. This decoupling means nodes can be started, stopped, or restarted in any order without breaking the system — for example circle_motion can publish to /cmd_vel even if odom_monitor isn't running yet. The topic acts as the middleman, allowing multiple publishers and subscribers to connect to the same channel simultaneously, making it easy to add new nodes (like a logger or visualizer) without modifying any existing code.

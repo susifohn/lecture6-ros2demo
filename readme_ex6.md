@@ -2,6 +2,10 @@
 
 [Link to repo](https://github.com/susifohn/lecture6-ros2demo/tree/main)
 
+Name: Christian.Kissling@students.unibe.ch
+
+Ros2 version. local 5.1.3
+
 ## Prerequisites
 Following the readme went ok, but forgot to set the **GPU Passthrough**. Went through after the correction. 
 
@@ -293,3 +297,95 @@ root@49ed0b86c179:/workspace/turtlebot3_ws#
 How does pub-sub decoupling work?
 ### Answer
 In ROS2, publishers and subscribers are completely independent — a publisher simply sends messages to a topic without knowing if anyone is listening, and a subscriber reads from that topic without knowing who is sending. This decoupling means nodes can be started, stopped, or restarted in any order without breaking the system — for example circle_motion can publish to /cmd_vel even if odom_monitor isn't running yet. The topic acts as the middleman, allowing multiple publishers and subscribers to connect to the same channel simultaneously, making it easy to add new nodes (like a logger or visualizer) without modifying any existing code.
+
+## Aufgabe 2
+
+### ros2 topic list
+```bash
+root@49ed0b86c179:/workspace/turtlebot3_ws# ros2 topic list 
+/clock
+/cmd_vel
+/imu
+/joint_states
+/odom
+/parameter_events
+/performance_metrics
+/robot_description
+/rosout
+/scan
+/tf
+/tf_static
+root@49ed0b86c179:/workspace/turtlebot3_ws# 
+```
+
+### ros2 topic info /cmd_vel
+```bash
+root@49ed0b86c179:/workspace/turtlebot3_ws# ros2 topic info /cmd_vel
+Type: geometry_msgs/msg/Twist
+Publisher count: 2
+Subscription count: 1
+root@49ed0b86c179:/workspace/turtlebot3_ws# 
+```
+
+### ros2 topic hz /odom
+```bash
+root@49ed0b86c179:/workspace/turtlebot3_ws# ros2 topic hz /odom
+average rate: 26.898
+        min: 0.034s max: 0.043s std dev: 0.00201s window: 28
+average rate: 27.141
+        min: 0.031s max: 0.050s std dev: 0.00324s window: 56
+average rate: 27.346
+        min: 0.031s max: 0.050s std dev: 0.00305s window: 84
+average rate: 27.200
+        min: 0.031s max: 0.050s std dev: 0.00307s window: 111
+average rate: 27.051
+        min: 0.031s max: 0.050s std dev: 0.00339s window: 138
+average rate: 27.075
+```
+
+### ros2 node list
+```bash
+^Croot@49ed0b86c179:/workspace/turtlebot3_ws# ros2 node list
+/circle_motion
+/gazebo
+/odom_monitor
+/robot_state_publisher
+/teleop_keyboard
+/turtlebot3_diff_drive
+/turtlebot3_imu
+/turtlebot3_joint_state
+/turtlebot3_laserscan
+root@49ed0b86c179:/workspace/turtlebot3_ws# 
+```
+### Question
+What is /odom frequency? Why does frequency matter for robot control?
+### Answer
+The /odom topic is typically published at 30-50 Hz by the TurtleBot3, which you can verify with ros2 topic hz /odom. Frequency matters for robot control because a higher rate means more up-to-date position data, allowing the controller to react faster and more accurately to changes — too low a frequency causes the robot to overshoot or behave erratically. For cmd_vel, publishing too slowly risks the robot stopping due to the safety timeout, while publishing too fast wastes CPU resources.
+
+### Question
+How many publishers and subscribers does /cmd_vel have when your nodes are
+running? List them.
+### Answer
+Same as above. 
+- Publisher count: 2
+- Subscription count: 1
+
+### Question
+What’s the difference between ros2 topic hz and ros2 topic bw? (2 sentences)
+### Answer
+ros2 topic hz measures the publishing frequency (how many messages per second arrive on a topic), while ros2 topic bw measures the bandwidth (how many bytes per second are being transmitted). For /odom, hz tells you how often the robot updates its position estimate, while bw tells you the data size cost — useful when optimizing network usage in multi-robot or real hardware deployments.
+
+## Aufgabe 2b
+
+![rqt_graph](./assets/CPS_Ex06_rqt_graph.png)
+
+### Question
+What does the graph show? How are nodes connected? (2-3 sentences)
+### Answer
+The graph shows that circle_motion publishes velocity commands to /cmd_vel, which is consumed by the TurtleBot3 differential drive controller to physically move the robot. The controller then publishes the resulting robot position and velocity to /odom, which odom_monitor subscribes to in order to log the data. This visualizes the classic sense-act loop in robotics: a node commands motion, the robot acts, and another node monitors the outcome — all connected purely through topics with no direct node-to-node communication.
+
+### Question
+What happens if you stop the circle_motion node? Does odom_monitor still
+work? Why? (2 sentences)
+### Answer
+If you stop circle_motion, the robot will stop moving (no more /cmd_vel messages) but odom_monitor keeps running and continues logging — it will just show position and velocity values of zero. This demonstrates pub-sub decoupling: odom_monitor is completely independent of circle_motion and only cares about the /odom topic, not about who or what is causing the robot to move.
